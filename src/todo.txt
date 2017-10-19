@@ -1,0 +1,8 @@
+1. getrandomPath 3 != 2.999999996
+Answer: use unittest.TestCase.assertAlmostEqual()
+
+2. gyn的论文中的ctmc模型中涉及到模型之间的同步的部分，如何在何佳的代码中实现。
+
+3. unbounded until的验证
+
+4. steady-state property的验证。

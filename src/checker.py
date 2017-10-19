@@ -27,7 +27,7 @@ class Checker(threading.Thread):
     # op: Operator of the proposition.  
     # type: Choose qualitative or quantitative algorithm 
     # frame: window's handler 
-    def __init__(self, pts, ltl, a, b, c, d, k, p, op, type, frame, FinishEventClass=None): 
+    def __init__(self, pts, ltl, a, b, c, d, k, p, op , type, frame=None, FinishEventClass=None): 
         threading.Thread.__init__(self)
         self.pts = pts
         self.ltl = ltl
