@@ -1,50 +1,57 @@
 # 1.Checker.py
 __author__ = 'hekk'
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+import copy
 import random
 import threading
-# import wx
-# import wx.lib.newevent
+import re
 
-#The state of adjacent list.
-class state():
-    def __init__(self, sid, postStates, ap):
-        self.id = sid
-        self.postStates = postStates
-        self.ap = ap
 
-    def __str__(self): 
-        if self.ap is not None: 
-            return "id: " + str(self.id) + " ap:" + ''.join(self.ap) 
-    def __len__(self): 
-        return len(self.ap) 
+# class represent an interval in DTMC/CTMC
+# using -1 as the end to represent the unbound situation
+class Interval:
+    def __init__(self, begin, end):
+        self.begin = begin
+        self.end = end
+        self.bounded = begin*end >= 0
 
-class Checker(threading.Thread): 
+    def __getitem__(self, n):
+        if n == 0:
+            return self.begin
+        else:
+            return self.end
+
+    def interleaveWith(self, interval):
+        if not self.bounded and not interval.bounded:
+            return True
+        elif self.bounded and not interval.bounded:
+            return self.end > interval.begin
+        elif not self.bounded and interval.bounded:
+            return interval.end > self.begin
+        else:
+            return (self.end-interval.begin)*(self.begin-interval.end) < 0
+
+class Checker(threading.Thread):
+    # model: DTMC/CTMC models represented as an instance of ModulesFile 
+    # ltl: a CSL/PCTL formula's ltl part
     # a, b: Alpha parameter and beta parameter of beta distribution.  
     # c, d: Confidence parameter and approximate parameter.  
-    # k: Length of random path.  
-    # p: Probability threshold of the proposition.  
-    # op: Operator of the proposition.  
-    # type: Choose qualitative or quantitative algorithm 
-    # frame: window's handler 
-    def __init__(self, pts, ltl, a, b, c, d, k, p, op , type, frame=None, FinishEventClass=None): 
+    # duration: number of seconds to determine the sample path length. 
+    # In DTMC cases, it just represents the number of steps
+    def __init__(self, model, ltl, a=1, b=1, c=0.8, d=0.1, duration=1.0): 
         threading.Thread.__init__(self)
-        self.pts = pts
+        self.model = model
         self.ltl = ltl
         self.a = a
         self.b = b
         self.c = c
         self.d = d
-        self.k = k
-        self.p = p
-        self.op = op
-        self.type = type
         self.lower = 0.0
         self.upper = 0.0
         self.is_satisfy = False
-        self.frame = frame
-        self.decided_prefixes = {}
-        # self.FinishEventClass = FinishEventClass
+        self.cachedPrefixes = dict()
 
     def __max_state_of(self, states):
         # print states
@@ -72,31 +79,9 @@ class Checker(threading.Thread):
         d2 = p*p*(p+1.0)
         return d1/d2
 
-    #TODO overflow
-    #Get Max sample size
-    def getMaxSize(self, a, b, c, d):
-        s = self
-        n = 1
-        variance = (1-c)*d*d 
-        if (variance == 0): return 0
 
-        res = s.__getVar_m(n, a, b)
-        while res >= variance:
-            n = n*2
-            res = s.__getVar_m(n, a, b)
-
-        low = n/2
-        high = n
-        while low <= high:
-            mid = (low+high)/2
-            tvar = s.__getVar_m(mid, a, b)
-            if variance == tvar:
-                return mid
-            elif tvar < variance:
-                high = mid-1
-            else:
-                low = mid+1
-        return low
+    def getSampleSize(self):
+        return int(1.0/((1-self.c)*4*self.d*self.d)-self.a-self.b-1)
 
 
     # path: list of states(NOT list of ap of states!!!)
@@ -199,63 +184,10 @@ class Checker(threading.Thread):
                 print "IndexError: " + str(state_id)
             return path[state_id]
 
-    #Get a random path
-    def getPath(self, decided_prefixes):
-        pts = self.pts
-        k = self.k
-        satisfied = None
-        import copy
-        path = list()
-        sid = 1 #stateid
-        # insert copy of state's object into path
-        # to make all elements in path have distinct ids
-        path.append(copy.copy(pts[sid]))
-
-        for i in range(k):
-            rnd = random.random()
-            sum = 0.0
-
-            if (len(pts[sid].postStates) == 0): return path
-
-            for j in range(len(pts[sid].postStates)):
-                try:
-                    sum += pts[sid].postStates[j][1]
-                except Exception as e:
-                    print "exception happens: " + str(sid)
-                    raise e
-                
-                if(sum >= rnd):
-                    sid = pts[sid].postStates[j][0]
-                    break
-            path.append(copy.copy(pts[sid]))
-            # check if p has been in decided_prefixes
-            key = ''.join([str(p.id) for p in path])
-            if decided_prefixes.has_key(key):
-                satisfied = decided_prefixes[key]
-                return (path, satisfied)
-        # print "path's length: "+str(len(path))
-        return (path, satisfied)
-    # def getPath(self):
-    #     s = self
-    #     path = list()
-    #     sid = 1 #stateid
-    #     path.append(self.pts[sid].ap)
-
-    #     for i in range(self.k):
-    #         rnd = random.random()
-    #         sum = 0.0
-
-    #         if (len(self.pts[sid].postStates) == 0): return path
-
-    #         for j in range(len(self.pts[sid].postStates)):
-    #             sum += self.pts[sid].postStates[j][1]
-    #             if(sum >= rnd):
-    #                 sid = self.pts[sid].postStates[j][0]
-    #                 break
-    #         path.append(self.pts[sid].ap)
-
-    #     return path
-
+    # returned (result, path e.g. list of Step instance)
+    # using cachedPrefixes to check the path's checking result beforehand
+    def getRandomPath(self):
+        return self.modulesFile.genRandomPath(self.duration, self.cachedPrefixes)
 
     def get_decidable_prefix(self, path, state_id, ltl, ltl_root):
         print "result of get_key_state: "
@@ -265,250 +197,115 @@ class Checker(threading.Thread):
         idx = [id(p) for p in path].index(id(key_state))
         return path[0:idx+1]
 
-    #Portal of check algorithm
-    def verify(self, path, ltl, pts):
-        min_rstate = -1
-        states = self.__rverify(0, path)
-        if None is states:
-            return False
-        elif 0 in states:
-            return True
+    # ltl verification method
+    # return: boolean
+    # path: list of Step instance
+    def verify(self, path):
+        logging.info('Verification begins.')
+        logging.info('ltl: %s' % str(self.ltl))
+        satisfiedStates = self._rverify(path, 0)
+        return 0 in [state.stateId for state in satisfiedStates]
+
+    # ltlRoot: current ltl symbol's index in ltl
+    # return: set of State instance's id that satisfy ltl
+    # if no state satisfy ltl, return empty set()
+    def _rverify(self, path, ltlRoot):
+        ltl = self.ltl
+        if ltlRoot > len(ltl):
+            return set()
+        elif ltl[ltlRoot] == '&':  #conjunction
+            lstates = self._rverify(path, ltlRoot*2+1)
+            rstates = self._rverify(path, ltlRoot*2+2)
+            return lstates & rstates
+        elif ltl[ltlRoot] == '|': #disjunction
+            lstates = self._rverify(path, ltlRoot*2+1)
+            rstates = self._rverify(path, ltlRoot*2+2)
+            return lstates | rstates
+        elif ltl[ltlRoot] == '!':
+            lstates = self._rverify(path, ltlRoot*2+1)
+            return set([step.stateId for step in path])-lstates
+        elif ltl[ltlRoot][0] == 'U':
+            if len(ltl[ltlRoot]) > 0:
+                nums = re.findall(ur'\d+', ltl[ltlRoot])
+                if len(nums) != 2:
+                    logging.error("Time interval for until formula must contains two values: begin and end.")
+                    return None
+            timeInterval = map(lambda x: int(x), nums)
+            timeInterval = Interval(*timeInterval)
+            if timeInterval[0] > timeInterval[1]:
+                logging.error("invalid ltl until time interval")
+                return set()
+
+            lstates = self._rverify(path, ltlRoot*2+1)
+            logging.info('left formula finished.')
+            logging.info('lstates size: %s' % str(len(lstates)))
+            rstates = self._rverify(path, ltlRoot*2+2)
+            logging.info('right formula finished.')
+            logging.info('rstates size: %s' % str(len(rstates)))
+            return self._checkU(lstates, rstates, path, timeInterval)
+        elif ltl[ltlRoot] == 'X':
+            lstates = self._rverify(path, ltlRoot*2+1)
+            return self._checkX(lstates)
+        elif ltl[ltlRoot] == 'T':
+            # the True situation
+            return set([step.stateId for step in path])
+            # return set([stateTuple[0] for stateTuple in path])
         else:
-            return False
+            ap = ltl[ltlRoot]
+            return self._checkAP(path, ap)
 
-    #Check until
-    # def checkU(self, lstates, rstates, path):
-    #     if rstates == None:
-    #         return None
 
-    #     i = len(path)-1
-    #     states = set()
-    #     started = False
+    # check y1 U(Interval) y2
+    # lstates: states that satisfy y1
+    # rstates: states that satisfy y2
+    # path: list of Step instance
+    # PAY ATTENTION THAT THE DEFINITION OF Step class has changed!
+    # timeInterval: the interval parameter of until formula
+    # return: states's ids that satisfy y1 U(Interval) y2
+    def _checkU(self, lstates, rstates, path, timeInterval):
+        # the idea here...
+        # if there's state i that satisfy y2
+        # and any states that before i satisfy y1
+        # then add both i and j(<i) to states.
+        logging.info('Enter _checkU')
+        result = set()
+        started = False
 
-    #     while i >= 0:
-    #         if i in rstates:
-    #             started = True
-    #             states.add(i)
-    #         elif i in lstates and started:
-    #             states.add(i)
-    #         else:
-    #             started = False
-    #         i -= 1
-    #     return states
-
-    # lstates, rstates: set of states that satisfy y1 and y2
-    def checkU(self, lstates, rstates, path): 
-        # print "checkU..." 
-        # print "lstates:" 
-        # print str(lstates) 
-        # print "rstates:" 
-        # print str(rstates) 
-        # print "path:" 
-        # for p in path: 
-        #     print p 
-        # print "steps:" + str(steps) 
-        if rstates == None: 
-            return None 
-        i = len(path)-1 
-        states = set() 
-        started = False 
-        # the idea here...  
-        # if there's state i that satisfy y2 
-        # and any states that before i satisfy y1 
-        # then add both i and j(<i) to states.  
-        # min_rstate: the minimum index of state in path that satisfy y2 
-        min_rstate = -1 
-        if len(rstates) > 0: 
-            min_rstate = max(rstates)
-        else:
-            # There's no states that satisfy y2
-            # thus no states satisfy y1 U y2 
-            return (set(), min_rstate)
-        while i >= 0:
-            if i in rstates:
-                if min_rstate > i:
-                    min_rstate = i
-                started = True
-                states.add(i)
-            elif i in lstates and started:
-                states.add(i)
+        # TODO traverse throught the path from the beginning?
+        for index,step in enumerate(path[::-1]):
+            stateId = step.stateId
+            if stateId in rstates:
+                # check if state is within timeInterval
+                stateBeginTime = step.passedTime
+                stateEndTime = step.passedTime + step.holdingTime
+                interval = Interval(stateBeginTime, stateEndTime)
+                if interval.interleaveWith(timeInterval):
+                    result.add(stateId)
+                    started = True
+            elif stateId in lstates and started:
+                result.add(stateId)
             else:
                 started = False
-            i -= 1
-        return (states, min_rstate)
+        return result
 
+    def _checkX(self, lstates):
+        result = set()
+        for stateId in lstates:
+            if stateId >= 1:
+                result.add(stateId)
+        return result
 
-    #Check next
-    def checkX(self, lstates, path):
-        if lstates==None:
-            return None
+    def _checkAP(self, path, ap):
+        result = set()
+        for stateId, apSet in zip([step.stateId for step in path], [step.apSet for step in path]):
+            if ap in apSet:
+                result.add(stateId)
+        return result
 
-        l = len(path)-1
-        states = set()
-        for sid in lstates:
-            if(sid-1 >= 0):
-                states.add(sid-1)
-        return states
-
-    #Check AP
-    # def verifyAP(self, root, path, ltl):
-    #     if(root > len(ltl)-1):
-    #         return None
-    #     ap = ltl[root]
-    #     i = 0  #order in path
-    #     states = set()
-    #     while i <= len(path)-1:
-    #         if ap in path[i]:
-    #             states.add(i)   #because stat no from1
-    #         i += 1
-    #     return states
-
-    # verifyAP returns empty set or set of states' id that contains the ltl[root]
-    # but if root is out of ltl's indexes, then return None
-    def verifyAP(self, root, path, ltl):
-        if(root > len(ltl)-1):
-            return None
-        ap = ltl[root]
-        i = 0  #order in path
-        states = set()
-        while i <= len(path)-1:
-            # print "path[i]: "
-            # print path[i]
-            if len(path[i]) == 0:
-                pass
-            elif ap in path[i]:
-                states.add(i)   # because stat no from1
-            i += 1
-        return states
-
-    #root: The root state's id of property.
-    #Checking recursively
-    # def __rverify(self, root, path, ltl, pts):
-    #     if root > len(ltl)-1:
-    #         return None
-    #     elif ltl[root] == '&':  #conjunction
-    #         lstates = self.__rverify(root*2+1, path, ltl, pts)
-    #         rstates = self.__rverify(root*2+2, path, ltl, pts)
-    #         if lstates is not None and rstates is not None:
-    #             return lstates & rstates
-    #         elif lstates is not None and rstates is None:
-    #             return lstates
-    #         elif lstates is None and rstates is not None:
-    #             return rstates
-    #         else:
-    #             return None
-    #     elif ltl[root] == '|': #disjunction
-    #         lstates = self.__rverify(root*2+1, path, ltl, pts)
-    #         rstates = self.__rverify(root*2+2, path, ltl, pts)
-    #         if lstates is not None and rstates is not None:
-    #             return lstates | rstates
-    #         elif lstates is not None and rstates is None:
-    #             return lstates
-    #         elif lstates is None and rstates is not None:
-    #             return rstates
-    #         else:
-    #             return None
-    #     elif ltl[root] == '!':
-    #         lstates = self.__rverify(root*2+1,path,ltl, pts)
-    #         if lstates is not None:
-    #             return set(range(len(path)))-lstates
-    #         else:
-    #             return set(range(len(path)))
-    #     elif ltl[root] == 'U':
-    #         lstates = self.__rverify(root*2+1, path, ltl, pts)
-    #         rstates = self.__rverify(root*2+2, path, ltl, pts)
-    #         if lstates is not None and rstates is not None:
-    #             return self.checkU(lstates, rstates,path)
-    #         elif rstates == None:
-    #             return None
-    #         else:
-    #             return rstates
-    #     elif ltl[root] == 'X':
-    #         lstates = self.__rverify(root*2+1, path, ltl, pts)
-    #         return self.checkX(lstates, path)
-    #     else:
-    #         return self.verifyAP(root, path, ltl)
-
-
-    # root: id of root index in ltl
-    # path: list of ap
-    # ltl: linear temporal logic formula
-    # pts: probabilistic transition system
-    # return: a set of the index of state that satisfied in path. NOT THE STATE'S ID!
-
-    # make some change to ltl until part
-    # from "U" to "Usteps", for example "U10"
-    def __rverify(self, root, path):
-        ltl = self.ltl
-        if root > len(ltl)-1:
-            return None
-        elif ltl[root] == '&':  #conjunction
-            lstates = self.__rverify(root*2+1, path)
-            rstates = self.__rverify(root*2+2, path)
-            if lstates is not None and rstates is not None:
-                return lstates & rstates
-            elif lstates is not None and rstates is None:
-                return lstates
-            elif lstates is None and rstates is not None:
-                return rstates
-            else:
-                return None
-        elif ltl[root] == '|': #disjunction
-            lstates = self.__rverify(root*2+1, path)
-            rstates = self.__rverify(root*2+2, path)
-            if lstates is not None and rstates is not None:
-                return lstates | rstates
-            elif lstates is not None and rstates is None:
-                return lstates
-            elif lstates is None and rstates is not None:
-                return rstates
-            else:
-                return None
-        elif ltl[root] == '!':
-            lstates = self.__rverify(root*2+1,path)
-            if lstates is not None:
-                return set(range(len(path)))-lstates
-            else:
-                return set(range(len(path)))
-        elif ltl[root][0] == 'U':
-            try:
-                steps = int(ltl[root][1:])
-            except ValueError as e:
-                print "until syntax error in _rverify"
-                print "to specify the steps restriction in Until check"
-                print "please use the form U10. "
-                raise e
-            lstates = self.__rverify(root*2+1, path)
-            rstates = self.__rverify(root*2+2, path)
-            # print("lstates: " + str(lstates))
-            # print("rstates: " + str(rstates))
-            if lstates is not None and rstates is not None:
-                # print "entering checkU"
-                states, min_rstate = self.checkU(lstates,rstates,path)
-                if min_rstate > 0 and min_rstate > steps:
-                    # print "until satisfied, but steps condition unsatisfied"
-                    return None
-                elif min_rstate > 0 and min_rstate <= steps:
-                    # print "steps condition satisfied"
-                    return states
-                elif min_rstate < 0:
-                    pass        
-            elif rstates == None:
-                return None
-            else:
-                return rstates
-        elif ltl[root] == 'X':
-            lstates = self.__rverify(root*2+1, path)
-            return self.checkX(lstates, path)
-        elif ltl[root] == 'T':
-            # the True situation
-            return range(len(path))
-        else:
-            return self.verifyAP(root, path, ltl)
 
     #Get the expectation value of posterior distribution.
-    def postEx(self, a, b, n, x):
-        return (a+x)/(n+a+b)
+    def postEx(self, n, x):
+        return (self.a+x)/(n+self.a+self.b)
 
     #Get confidence of estimating.
     def con(self, a, b, n, x, ex, p):
@@ -528,7 +325,7 @@ class Checker(threading.Thread):
         # event = self.FinishEventClass(output='Starting to verify...')
         # wx.PostEvent(self.frame, event)
 
-        sz = int(s.getMaxSize(s.a, s.b, s.c, s.d))
+        sz = int(s.getSampleSize(s.a, s.b, s.c, s.d))
         # event = self.FinishEventClass(output='The upper bound of sample size is '+str(sz))
         # wx.PostEvent(self.frame, event)
 
@@ -538,7 +335,7 @@ class Checker(threading.Thread):
         x,n = 0.0, 0.0
         postex = 0.0
         for i in range(sz):
-            path, satisfied = s.getPath(self.decided_prefixes)
+            satisfied,path = s.getRandomPath(self.decided_prefixes)
             # print "path:"
             # print "path:"
             # for p in path:
@@ -578,29 +375,30 @@ class Checker(threading.Thread):
 
     #Estiamte the probability of property holding
     def mc2(self):
-        s = self
-        sz = s.getMaxSize(s.a, s.b, s.c, s.d)
-        x,n = 0.0,0.0
+        sz = self.getSampleSize()
+        logging.info('Sampling size: %s' % sz)
+        x,n = 0,0
         for i in range(sz):
-            path, satisfied = s.getPath()
+            satisfied, path = self.getRandomPath()
             n += 1
-            if s.verify([p.ap for p in path], s.ltl, s.k):
-                x += 1
-        postex = s.postEx(s.a, s.b, n, x)
+            if not satisfied:
+                verified = self.verify(path)
+                if verified:
+                    x += 1
+            logging.info('Verified result: %s' % str(verified))
+
+        postex = s.postEx(n, x)
         l = postex-s.d
         h = postex+s.d
         l = 0 if l<0 else l
         h = 1 if h>1 else h
-
-        # event = self.FinishEventClass(output=str(int(n))+' samples are verified.')
-        # wx.PostEvent(self.frame, event)
 
         return l,h
 
     #Begin to check.
     def run(self):
         msg = None
-        if self.type == 0:
+        if self.checkingType == 0:
             self.is_satisfy = self.mc1()
             if self.is_satisfy:
                 msg = "The model satisfies the LTL."
@@ -610,105 +408,5 @@ class Checker(threading.Thread):
             self.lower,self.upper =  self.mc2()
             msg = "The probability is ["+str(self.lower)+","+str(self.upper)+"]."
 
-        #Post the event
-        # event = self.FinishEventClass(output=msg)
-        # wx.PostEvent(self.frame, event)
-
-
-def get_die_model():
-    # build the pts
-    s1post = [[2,0.5], [3,0.5]]
-    s1ap=set()
-    s1 = state(1, s1post, s1ap)
-
-    s2post=[[4,0.5], [5,0.5]]
-    s2ap=set()
-    s2=state(2, s2post, s2ap)
-
-    s3post = [[6,0.5], [7, 0.5]]
-    s3ap=set()
-    s3 = state(3, s3post, s3ap)
-
-    s4post = [[8,0.5], [2,0.5]]
-    s4ap=set()
-    s4 = state(4, s4post, s4ap)
-
-    s5post=[[9,0.5], [10,0.5]]
-    s5ap = set()
-    s5 = state(5, s5post, s5ap)
-
-    s6post=[[11,0.5], [12,0.5]]
-    s6ap= set()
-    s6 = state(6, s6post, s6ap)
-
-    s7post = [[13,0.5], [3,0.5]]
-    s7ap=set()
-    s7 = state(7, s7post, s7ap)
-
-    s8post = [[8,1]]
-    s8ap=set()
-    s8ap.add("1")
-    s8=state(8, s8post, s8ap)
-
-    s9post=[[9,1]]
-    s9ap=set()
-    s9ap.add("2")
-    s9=state(9,s9post, s9ap)
-
-    s10post=[[10,1]]
-    s10ap=set()
-    s10ap.add("3")
-    s10 = state(10, s10post , s10ap)
-
-    s11post=[[11,1]]
-    s11ap=set(["4"])
-    s11=state(11, s11post, s11ap)
-
-    s12post=[[12,1]]
-    s12ap=set(["5"])
-    s12= state(12, s12post , s12ap)
-
-    s13post = [[13,1]]
-    s13ap = set(["6"])
-    s13= state(13, s13post, s13ap)
-
-    return [13, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13]
-
-#Only 1 test case
-def test():
-    next='X'
-    until='U'
-    neg='!'
-    dis='|'
-    con='&'
-
-    a=1.0
-    b=1.0
-    c=0.99
-    d=0.02
-    k=10
-    p=0.02
-    op='>'
-    
-    pts = get_die_model()
-    ltl = ["U3", "T", "2"]
-    #  print "ltl:"
-    print "ltl:"
-    print ltl
-    ck=Checker(pts, ltl, a, b, c, d, k, p, op,1,None)
-    result=ck.mc1()
-    print(result)
-
-if __name__=='__main__':
-    # pass
-  test()
-
-
-
-
-# app = wx.PySimpleApp()
-# app.TopWindow = Test()
-# app.TopWindow.Show()
-# app.MainLoop()
 
 

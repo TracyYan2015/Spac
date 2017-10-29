@@ -1,8 +1,25 @@
-1. getrandomPath 3 != 2.999999996
+* getrandomPath 3 != 2.999999996
 Answer: use unittest.TestCase.assertAlmostEqual()
 
-2. gyn的论文中的ctmc模型中涉及到模型之间的同步的部分，如何在何佳的代码中实现。
+* gyn的论文中的ctmc模型中涉及到模型之间的同步的部分，如何在何佳的代码中实现。
+仿照PRISM中实现了Module类和ModulesFile类。
+    2.1 如何将新的Module类和ModulesFile类和旧的代码相整合？
+        * 旧的代码验证部分需要啥？
+        * 新的Module类和ModulesFile类能提供吗？
 
-3. unbounded until的验证
+* 整合checker为同时支持CTMC and DTMC.
+    * 如何确定取样路径的长度（统一DTMC和CTMC两种情况）
 
-4. steady-state property的验证。
+* unbounded until的验证
+VESTA support model checking of unbounded until check.
+
+* steady-state property的验证。
+
+* write unit test for other functions
+
+* 查清楚为什么beta分布适合做二项分布成功概率的先验分布。
+
+* 如何实现action之间的同步（即同名action一个做就全部做），{actionName:[updateFunc]}
+
+* deepcopy太耗时了，所以在产生长随机路径的时候（duration达到30天例如），所以需要尽量避免使用deepcopy。
+

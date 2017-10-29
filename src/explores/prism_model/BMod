@@ -1,0 +1,10 @@
+ctmc
+module Amod
+	d:[0..2] init 2;
+	[]d=2->1:(d'=0);
+endmodule
+
+module BMod
+	c:[0..2] init 2;
+	[]d=0&c=0->1:(c'=1);
+endmodule

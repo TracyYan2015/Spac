@@ -424,15 +424,6 @@ def _rverify(root, apPath, ltl, pts=None):
 # movedtochecker.py
 # lstates, rstates: set of states that satisfy y1 and y2
 def checkU(lstates, rstates, apPath):
-    print "checkU..."
-    print "lstates:"
-    print str(lstates)
-    print "rstates:"
-    print str(rstates)
-    print "apPath:"
-    for p in apPath:
-        print p
-    # print "steps:" + str(steps)
     if rstates == None:
         return None
     

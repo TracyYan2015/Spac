@@ -1,0 +1,73 @@
+1. AT697F CPU处理模块
+const double fail_d=1/(10*365*24*3600);
+const double tran_d=1/(12*3600);
+const double tran_r2=1/35;
+const double tau=1/600;
+const double normal_d=1;
+const MAX_COUNT = 2;
+module AT697F
+    // variables
+    d:[0..2]init 2;
+    count:[0..MAX_COUNT+1] init 0;
+    // commands
+    [ ]d>0->fail_d:(d'=0);
+    [ ]d=2->tran_d:(d'=1);
+    [ ]d=2->normal_d:(d'=2) // module stays normal
+    [d_reboot] d=1->tran_r2:(d'=2);
+    [timeout]comb->tau:(count'=0);
+    [timeout]!comb->tau:(count'=min(count+1，MAX_COUNT+1)); 
+endmodule
+
+2. AX2000 模拟量采集模块
+const double fail_b=1/(5*365*24*3600);
+const double tran_b=1/(12*3600);
+const double tran_r1=1/35;
+const double normal_b=1;
+module AX2000
+    m:[0..2] init 2;
+    []m>0->fail_b:(m'=0);
+    []m=2->tran_b:(m'=1);
+    []m=2->normal_b:(m'=2)
+
+    [b_reboot] m=1->tran_r1:(m'=2);
+endmodule
+
+3. AFS600 数据处理模块
+const double fail_a = 1/(5*365*24*3600);
+const double normal_a = 1;
+module AFS600
+    i : [0..1] init 1;
+    [] i=1 -> fail_a : (i'=0); 
+    [] i=1 -> normal_a : (i'=1);
+endmodule
+
+4. V5-FPGA 指令解析模块
+const double fail_c = 1/(5*365*24*3600);
+const double normal_c = 1;
+module V5-FPGA
+    o : [0..1] init 1;
+    [] o=1 & (d=2&a=1) -> fail_c : (o'=0);
+    [] o=1 -> normal_c : (o'=1);
+endmodule
+
+
+5. AT7910 总线模块
+const double fail_e = 1/(5*365*24*3600);
+const double normal_e = 1;
+module AT7910
+    a : [0..1] init 1;  
+    [] a=1 -> normal_e : (a'=1);
+    [] a=1 -> fail_e : (a'=0);
+endmodule
+
+验证要求
+* 计算单位时间系统用电量以及其他指标（reward）
+* 定量算法：计算一个until式子满足的概率。
+
+模型中count的用处
+count表示当系统某一模块发生瞬间故障时，重启修复瞬态故障之后在一个时钟周期内仍未恢复正常，则将计数器count+1，如果得到某个上限，则认为系统发生超时故障，系统关闭。
+
+More about count
+关于count，在系统正常运行的过程中，count不会累加，只有在系统产生瞬间故障或是永久故障时，过了一个时钟周期后，count才会累加，然后超过了MAX_COUNT+1后，系统关闭。
+
+

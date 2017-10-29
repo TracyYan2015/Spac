@@ -1,0 +1,22 @@
+1. PRISM's variable can only be integers or boolean; PRISM's constants can be integers, doubles and boolean. 
+
+2. PRISM中如何实现modules间action的同步
+Answer: List<String>. 
+    2.1 Related class
+        2.1.1 Module
+                    * moduleName
+                    * [Declaration](list of Declaration)
+                        * variable name
+                        * Declaration Type
+                        * init value
+                    * [Command]
+                        * synch(action label)
+                        * (synchIndex)command index in module's command list
+                        * guard(Expression)
+                        * updates(List of Update instance)
+                        * module(Module the command belongs to)
+
+        2.1.2 SimulatorEngine
+            
+
+

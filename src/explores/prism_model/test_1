@@ -1,0 +1,4 @@
+ctmc
+module AMod
+	d:[0..2] init 2;
+endmodule
