@@ -34,13 +34,15 @@ class Interval:
             return (self.end-interval.begin)*(self.begin-interval.end) < 0
 
 class Checker(threading.Thread):
+    class CheckingType:
+        QUANTATIVE, QUALITATIVE = range(2)
     # model: DTMC/CTMC models represented as an instance of ModulesFile 
     # ltl: a CSL/PCTL formula's ltl part
     # a, b: Alpha parameter and beta parameter of beta distribution.  
     # c, d: Confidence parameter and approximate parameter.  
     # duration: number of seconds to determine the sample path length. 
     # In DTMC cases, it just represents the number of steps
-    def __init__(self, model, ltl, a=1, b=1, c=0.8, d=0.1, duration=1.0): 
+    def __init__(self, model=None, ltl=None, a=1, b=1, c=0.8, d=0.1, duration=1.0, checkingType=None): 
         threading.Thread.__init__(self)
         self.model = model
         self.ltl = ltl
@@ -52,6 +54,8 @@ class Checker(threading.Thread):
         self.upper = 0.0
         self.is_satisfy = False
         self.cachedPrefixes = dict()
+        self.checkingType = checkingType
+        self.duration = duration
 
     def __max_state_of(self, states):
         # print states
@@ -87,7 +91,7 @@ class Checker(threading.Thread):
     # path: list of states(NOT list of ap of states!!!)
     # state_id: the index of state in path, NOT the state'id
     # return: the key state object
-    def __get_key_state(self, path, state_id, ltl, ltl_root):
+    def _get_key_state(self, path, state_id, ltl, ltl_root):
         ltl_root_symbol = ltl[ltl_root]
         if ltl_root_symbol == '&':
             res_states = self.__rverify(ltl_root, [p.ap for p in path])
@@ -187,7 +191,7 @@ class Checker(threading.Thread):
     # returned (result, path e.g. list of Step instance)
     # using cachedPrefixes to check the path's checking result beforehand
     def getRandomPath(self):
-        return self.modulesFile.genRandomPath(self.duration, self.cachedPrefixes)
+        return self.model.genRandomPath(self.duration, self.cachedPrefixes)
 
     def get_decidable_prefix(self, path, state_id, ltl, ltl_root):
         print "result of get_key_state: "
@@ -208,7 +212,7 @@ class Checker(threading.Thread):
 
     # ltlRoot: current ltl symbol's index in ltl
     # return: set of State instance's id that satisfy ltl
-    # if no state satisfy ltl, return empty set()
+    # if no state's stateId satisfy ltl, return empty set()
     def _rverify(self, path, ltlRoot):
         ltl = self.ltl
         if ltlRoot > len(ltl):
@@ -387,9 +391,9 @@ class Checker(threading.Thread):
                     x += 1
             logging.info('Verified result: %s' % str(verified))
 
-        postex = s.postEx(n, x)
-        l = postex-s.d
-        h = postex+s.d
+        postex = self.postEx(n, x)
+        l = postex-self.d
+        h = postex+self.d
         l = 0 if l<0 else l
         h = 1 if h>1 else h
 
@@ -398,15 +402,13 @@ class Checker(threading.Thread):
     #Begin to check.
     def run(self):
         msg = None
-        if self.checkingType == 0:
+        if self.checkingType == Checker.CheckingType.QUALITATIVE:
             self.is_satisfy = self.mc1()
             if self.is_satisfy:
                 msg = "The model satisfies the LTL."
             else:
                 msg = "The model does not satisfy the LTL."
         else:
-            self.lower,self.upper =  self.mc2()
-            msg = "The probability is ["+str(self.lower)+","+str(self.upper)+"]."
-
+            return self.mc2()  
 
 

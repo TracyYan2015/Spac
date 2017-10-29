@@ -20,21 +20,11 @@ class ModulesFileTest(unittest.TestCase):
     #     self.assertFalse(initState.checkAP('down'))
     #     self.assertFalse(initState.checkAP('danger'))
 
-    def testGenRandomPath(self):
-        model = ModulesFile.GYNCTMCModel()
-        duration = float(3600)
-        # result,path = model.genRandomPath(duration)
-        # f = file('/Users/bitbook/Documents/PostGradCourses/MainProj/Spac/src/datas/RandomPath.txt', 'wb')
-        # for step in path:
-        #     f.write(str(step))
-        #     f.write('\n')
-        # f.close()
-
     def testGenRandomPath2(self):
         model = ModulesFile.GYNCTMCModel()
         duration = float(3600)
-        model.prepareCommands()
         result,path = model.genRandomPath(duration)
+        model.exportPathTo(path, 'path.txt')
 
 
 if __name__ == '__main__':

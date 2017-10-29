@@ -22,4 +22,6 @@ VESTA support model checking of unbounded until check.
 * 如何实现action之间的同步（即同名action一个做就全部做），{actionName:[updateFunc]}
 
 * deepcopy太耗时了，所以在产生长随机路径的时候（duration达到30天例如），所以需要尽量避免使用deepcopy。
+事实上是，如何不使用copy，所需时间会更短。
+
 
