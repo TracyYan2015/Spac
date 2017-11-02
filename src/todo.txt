@@ -15,7 +15,7 @@ VESTA support model checking of unbounded until check.
 
 * steady-state property的验证。
 
-* write unit test for other functions
+* write unit test for other functions.
 
 * 查清楚为什么beta分布适合做二项分布成功概率的先验分布。
 
@@ -23,5 +23,9 @@ VESTA support model checking of unbounded until check.
 
 * deepcopy太耗时了，所以在产生长随机路径的时候（duration达到30天例如），所以需要尽量避免使用deepcopy。
 事实上是，如何不使用copy，所需时间会更短。
+
+* 现在来看应该是何佳的启发式算法能极大的提高验证的效率，因为郭的模型中的重复路径太多了，所以能极大的提高验证的效率。
+
+
 
 

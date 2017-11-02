@@ -10,4 +10,8 @@ class Step(object):
         self.passedTime = passedTime
 
     def __str__(self):
-        return '( ' + str(self.apSet) + ', ' + str(self.holdingTime) + 's )'
+        return '( ' + str(self.apSet) + ', holdingTime:' + str(self.holdingTime) + 's )'
+
+    def doSomething(self):
+        for i in range(10):
+            pass

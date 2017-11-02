@@ -8,6 +8,7 @@ from collections import OrderedDict
 import time
 import copy, random
 import itertools
+import sys
 
 
 class ModelType:
@@ -103,15 +104,12 @@ class ModulesFile(object):
         # Since when initilize a module, all its local variables
         # have been initilized
         if not self.commPrepared:
-            logging.info('prepareCommands...')
             self.prepareCommands()
             self.commPrepared = True
-        logging.info('Starting generating random path.')
         start = time.time()
         path = list()
         timeSum = 0.0
         passedTime = 0.0
-        # logging.info('PATH:')
         while timeSum < duration:
             holdingTime = self.nextState()
             timeSum += holdingTime
@@ -123,8 +121,10 @@ class ModulesFile(object):
             passedTime += holdingTime
 
         end = time.time()
+        pathSize = sys.getsizeof(path)
         logging.info('Gen path of len %d and duration %ds.' % (len(path), duration))
         logging.info('Time caused: %ss' % str(end-start))
+        logging.info('Memory caused: %fk' % float(sys.getsizeof(path)/1024))
 
         self.restoreStateId()
         self.restoreInitState()

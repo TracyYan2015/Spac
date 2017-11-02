@@ -1,0 +1,17 @@
+(a U b) & c
+. . . . . . . . . .
+& -> verify |-> true -> max(key_state step y1, key_state step y2) -> max(key_state step, a U b, step): reduce computing the key state of a 'and' formula to computing of until formula.
+            |-> false -> min(key_state step y1, key_state step y2)
+
+| -> verify -> | -> True -> depends on whether only y1 holds or y2 holds or both holds
+               | -> False -> max(key_state step y1, key_state step y2)
+
+X -> key_state next_state y
+U -> verify -> |-> true -> least state in rstates (suppose it's not the least state in rstates(whose id's min_id), but some j(> min_id), then all states before j are in lstates, so the prefix until min_id also satisfy y1 U y2)
+               |-> false -> | -> no state satisfy y2 ? -> find the first state that not satisfy y1. If all states satisfy y1, return the whole path
+                            | -> exists one state satisfy y2 ? -> Among the states that before the state that satisfy y2, find the least state that doesn't satisfy y1
+
+
+AP -> return step
+
+!y -> return key_state step y
