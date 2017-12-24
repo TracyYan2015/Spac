@@ -4,7 +4,7 @@ import os, sys
 curDir = os.getcwd()
 parDir = os.path.abspath(os.path.dirname(curDir)+os.path.sep+".")
 sys.path.append(parDir)
-import CheckerCTMC
+import Checker
 import models.Models as Models
 import logging
 import ModulesFile
@@ -13,7 +13,7 @@ class CTMCTestCase(unittest.TestCase):
     def testGetRandomPath(self):
         ctmc = Models.TestCTMCModel # [#states, [state]]
         duration = 3
-        checker = CheckerCTMC.CheckerCTMC(ctmc=ctmc, duration=duration)
+        checker = Checker.CheckerCTMC(ctmc=ctmc, duration=duration)
         path = checker.getRandomPath(duration)
         duration2 = reduce(lambda x,y: x+y, [t[1] for t in path])
         self.assertAlmostEqual(duration, duration2,delta=1e-6)
@@ -21,7 +21,7 @@ class CTMCTestCase(unittest.TestCase):
     def testUntilCheck(self):
         ctmc = Models.TestCTMCModel # [#states, [state]]
         ltl = ['U[0,10]', 'default', 'full']
-        checker = CheckerCTMC.CheckerCTMC(ctmc=ctmc, csl=ltl, duration=3)
+        checker = Checker.Checker(model=ctmc, ltl=ltl, duration=3)
         for _ in range(200):
             path = checker.getRandomPath()
             stateIds = set([stateTuple[0].stateId for stateTuple in path])

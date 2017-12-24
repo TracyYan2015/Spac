@@ -5,7 +5,6 @@ import sys
 sys.path.append(pardir)
 
 class State(object):
-
     def __init__(self, stateId, apSet):
         self.stateId = stateId
         self.apSet = apSet
@@ -24,6 +23,9 @@ class State(object):
         for ap, func in labels.items():
             if func(vs, cs):
                 self.apSet.add(ap)
+
+    def clearAPSet(self):
+        self.apSet.clear()
 
 
 

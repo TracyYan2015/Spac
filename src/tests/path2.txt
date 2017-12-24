@@ -1,0 +1,3 @@
+stateId, apSet, passedTime, holdingTime, transition
+0, set(['up']), 0.0s, 2.43752085572s, di_fail
+1, set(['up']), 2.43752085572s, 1.73878305452s, i_fail

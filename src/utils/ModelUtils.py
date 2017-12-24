@@ -1,11 +1,11 @@
-import CheckerCTMC
+import Checker
 
 # transitionRateMatrix: ctmc transition rate matrix
 # apSetList: list of apSet for each row of matrix(each State)
 def ctmcFromMatrix(transitionRateMatrix, apSetList):
     ctmc = []
     for rowIndex, row in enumerate(transitionRateMatrix):
-        state = CheckerCTMC.State(rowIndex)
+        state = Checker.State(rowIndex)
         state.postStates = list() # solve the default parameters problem
         state.apSet = set()
         ctmc.append(state)
